@@ -15,7 +15,7 @@ from time import sleep
 
 from PyQt5.QtChart import (QChart, QChartView, QDateTimeAxis, QLineSeries,
                            QValueAxis)
-from PyQt5.QtCore import Qt, QPointF
+from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPainter, QPolygonF
 from PyQt5.QtWidgets import QMainWindow
 
@@ -23,31 +23,32 @@ from PyQt5.QtWidgets import QMainWindow
 class TestWindow(QMainWindow):
     def __init__(self, parent=None):
         super(TestWindow, self).__init__(parent=parent)
+        self.last = (0, 0)
         self.series = QLineSeries()
         self.view = QChartView()
-        self.data = []
         self.view.setRenderHint(QPainter.Antialiasing)
         self.setCentralWidget(self.view)
         self.setup()
 
     def setup(self):
         chart = QChart()
-        chart.addSeries(self.series)
         chart.setTitle("QT Charts example")
+        chart.addSeries(self.series)
 
         axisX = self.getXAxis()
-        chart.addAxis(axisX, Qt.AlignBottom)
-        self.series.attachAxis(axisX)
-
         axisY = self.getYAxis()
-        chart.addAxis(axisY, Qt.AlignLeft)
+
+        self.series.attachAxis(axisX)
+        chart.addAxis(axisX, Qt.AlignBottom)
+
         self.series.attachAxis(axisY)
+        chart.addAxis(axisY, Qt.AlignLeft)
+
         self.view.setChart(chart)
 
-    def addPoint(self, x, y):
-        self.data[0:10] = self.data[0:9] + [QPointF(x, y)]
-        print(len(self.data))
-        self.series.replace(self.data)
+    def add_point(self):
+        self.last = (self.last[0] + 1, self.last[1] + 2)
+        self.series.append(*self.last)
         self.setup()
 
     def getXAxis(self):
@@ -74,10 +75,8 @@ if __name__ == '__main__':
     window.show()
     window.resize(500, 400)
 
-    from random import randint
-
-    for index in range(0, 20):
-        window.addPoint(index, randint(0, 10))
-        app.processEvents()
+    # for _ in range(10):
+    #     window.add_point()
+    #     app.processEvents()
 
     sys.exit(app.exec_())
