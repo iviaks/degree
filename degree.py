@@ -13,7 +13,7 @@ a high number of points, using OpenGL accelerated series
 
 from time import sleep
 
-from PyQt5.QtChart import (QChart, QChartView, QDateTimeAxis, QLineSeries,
+from PyQt5.QtChart import (QChart, QChartView, QDateTimeAxis, QSplineSeries,
                            QValueAxis)
 from PyQt5.QtCore import Qt, QPointF
 from PyQt5.QtGui import QPainter, QPolygonF
@@ -21,21 +21,22 @@ from PyQt5.QtWidgets import QMainWindow
 
 
 class TestWindow(QMainWindow):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, app=None):
         super(TestWindow, self).__init__(parent=parent)
-        self.series = QLineSeries()
+        self.series = QSplineSeries()
         self.view = QChartView()
         self.data = []
+        self.app = app
         self.view.setRenderHint(QPainter.Antialiasing)
         self.setCentralWidget(self.view)
         self.setup()
 
-    def setup(self):
+    def setup(self, start=0, end=10):
         chart = QChart()
         chart.addSeries(self.series)
         chart.setTitle("QT Charts example")
 
-        axisX = self.getXAxis()
+        axisX = self.getXAxis(start, end)
         chart.addAxis(axisX, Qt.AlignBottom)
         self.series.attachAxis(axisX)
 
@@ -45,21 +46,24 @@ class TestWindow(QMainWindow):
         self.view.setChart(chart)
 
     def addPoint(self, x, y):
-        self.data[0:10] = self.data[0:9] + [QPointF(x, y)]
-        print(len(self.data))
+        self.data.append(QPointF(x, y))
         self.series.replace(self.data)
-        self.setup()
+        print(len(self.data) % 10 * 10)
+        self.setup(len(self.data) // 10 * 10, (len(self.data) // 10 + 1) * 10)
+        self.app.processEvents()
+        sleep(0.1)
 
-    def getXAxis(self):
-        axisX = QDateTimeAxis()
-        axisX.setTickCount(10)
-        axisX.setFormat("MMM yyyy")
+    def getXAxis(self, start=0, end=10):
+        axisX = QValueAxis()
+        axisX.setLabelFormat("%i")
+        axisX.setRange(start, end)
         axisX.setTitleText("Date")
         return axisX
 
     def getYAxis(self):
         axisY = QValueAxis()
         axisY.setLabelFormat("%i")
+        axisY.setTickCount(10)
         axisY.setTitleText("Money")
         return axisY
 
@@ -69,15 +73,14 @@ if __name__ == '__main__':
     from PyQt5.QtWidgets import QApplication
     app = QApplication(sys.argv)
 
-    window = TestWindow()
+    window = TestWindow(app=app)
     window.setWindowTitle("Simple performance example")
     window.show()
     window.resize(500, 400)
 
     from random import randint
 
-    for index in range(0, 20):
-        window.addPoint(index, randint(0, 10))
-        app.processEvents()
+    for index in range(200):
+        window.addPoint(index, randint(0, 100))
 
     sys.exit(app.exec_())
