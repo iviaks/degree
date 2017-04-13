@@ -64,6 +64,7 @@ class TestWindow(QMainWindow):
         axisY = QValueAxis()
         axisY.setLabelFormat("%i")
         axisY.setTickCount(10)
+        axisY.setRange(0, 100)
         axisY.setTitleText("Money")
         return axisY
 
@@ -78,9 +79,12 @@ if __name__ == '__main__':
     window.show()
     window.resize(500, 400)
 
-    from random import randint
+    index = 0
 
-    for index in range(200):
-        window.addPoint(index, randint(0, 100))
+    while True:
+        with open('input.txt') as file:
+            number = int(file.readline())
+            window.addPoint(index, number)
+        index += 1
 
     sys.exit(app.exec_())
