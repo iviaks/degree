@@ -14,7 +14,7 @@ a high number of points, using OpenGL accelerated series
 from time import sleep
 
 from PyQt5.QtChart import QChart, QChartView, QSplineSeries, QValueAxis
-from PyQt5.QtCore import QPointF, Qt, QRunnable, pyqtSlot, QThreadPool, QTimer
+from PyQt5.QtCore import QPointF, QRunnable, Qt, QThreadPool, QTimer, pyqtSlot
 from PyQt5.QtGui import QPainter
 from PyQt5.QtWidgets import (QCheckBox, QComboBox, QGridLayout, QHBoxLayout,
                              QMainWindow, QPushButton, QVBoxLayout, QWidget)
@@ -41,9 +41,6 @@ class Worker(QRunnable):
 class TestWindow(QMainWindow):
     def __init__(self, parent=None):
         super(TestWindow, self).__init__(parent=parent)
-        self.data = []
-        self.index = 0
-
         self.series = QSplineSeries()
         self.view = QChartView()
         self.glMain = QGridLayout()
@@ -100,7 +97,7 @@ class TestWindow(QMainWindow):
 
         self.glMain.addLayout(glButtons, 1, 0, 1, 2)
 
-    def setup(self, start=0, end=10):
+    def setup(self, start=0, end=20):
         chart = QChart()
         chart.addSeries(self.series)
         chart.setTitle("QT Charts example")
@@ -115,21 +112,21 @@ class TestWindow(QMainWindow):
         self.view.setChart(chart)
 
     def addPoint(self, x, y):
-        self.data.append(QPointF(x, y))
-        self.series.replace(self.data)
-        # print(len(self.data) % 10 * 10)
-        self.setup(len(self.data) // 10 * 10, (len(self.data) // 10 + 1) * 10)
+        self.series.append(QPointF(x, y))
+        self.setup(
+            start=self.series.count() // 20 * 20,
+            end=(self.series.count() // 20 + 1) * 20
+        )
 
     def recieve_data(self):
         with open('input.txt') as file:
             number = int(file.readline())
-            self.addPoint(self.index, number)
-            self.index += 1
+            self.addPoint(self.series.count(), number)
 
-    def getXAxis(self, start=0, end=10):
+    def getXAxis(self, start=0, end=20):
         axisX = QValueAxis()
         axisX.setLabelFormat("%i")
-        axisX.setTickCount(10)
+        axisX.setTickCount(20)
         axisX.setRange(start, end)
         axisX.setTitleText("Date")
         return axisX
