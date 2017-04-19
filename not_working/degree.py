@@ -1,15 +1,7 @@
-# processEvents
-
-
 # -*- coding: utf-8 -*-
 #
-# Licensed under the terms of the MIT License
-# Copyright (c) 2015 Pierre Raybaut
+# Copyright (c) 2017 Saykov Max
 
-"""
-Simple example illustrating Qt Charts capabilities to plot curves with
-a high number of points, using OpenGL accelerated series
-"""
 
 from time import sleep
 
@@ -82,18 +74,7 @@ class TestWindow(QMainWindow):
         self.setup()
 
         self.view.setWidget(self)
-        self.view.startTimer(500)
-
-        # self.setPoints()
-
-        # QMessageBox.warning(self, 'Error with getting data', 'Sorry, but application can\'t recieve data from Arduino. Please check connection between Arduino and PC')
-
-        # QFileDialog.getSaveFileName(self, 'Save temperature graph', 'Image (*.png);;All files (*)')
-
-        # self.timer = QTimer()
-        # self.timer.setInterval(499)
-        # self.timer.timeout.connect(self.recieve_data)
-        # self.timer.start()
+        self.view.startTimer(1000)
 
     def setupSerialPanel(self):
         cbSerial1 = QCheckBox('Serial 1')
