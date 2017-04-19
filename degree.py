@@ -14,10 +14,29 @@ a high number of points, using OpenGL accelerated series
 from time import sleep
 
 from PyQt5.QtChart import QChart, QChartView, QSplineSeries, QValueAxis
-from PyQt5.QtCore import QPointF, QRunnable, Qt, QThreadPool, QTimer, pyqtSlot
-from PyQt5.QtGui import QPainter
-from PyQt5.QtWidgets import (QCheckBox, QComboBox, QGridLayout, QHBoxLayout,
-                             QMainWindow, QPushButton, QVBoxLayout, QWidget)
+from PyQt5.QtCore import QPointF, QRunnable, Qt, QThreadPool, QTimer, pyqtSlot, QThread, QTimerEvent
+from PyQt5.QtGui import QPainter, QPen
+from PyQt5.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QGridLayout,
+                             QHBoxLayout, QMainWindow, QMessageBox,
+                             QPushButton, QVBoxLayout, QWidget)
+
+
+def recieve_data():
+    with open('input.txt') as file:
+        return int(file.readline())
+
+
+class CustomChartView(QChartView):
+    def __init__(self, *args, **kwargs):
+        self.index = 0
+        return super(CustomChartView, self).__init__(*args, **kwargs)
+
+    def setWidget(self, widget=None):
+        self.widget = widget
+
+    def timerEvent(self, *args):
+        self.widget.addPoint(self.index, recieve_data())
+        self.index += 1
 
 
 class Worker(QRunnable):
@@ -41,8 +60,14 @@ class Worker(QRunnable):
 class TestWindow(QMainWindow):
     def __init__(self, parent=None):
         super(TestWindow, self).__init__(parent=parent)
-        self.series = QSplineSeries()
-        self.view = QChartView()
+        self.series = [QSplineSeries() for index in range(4)]
+        self.series[0].setPen(QPen(Qt.red))
+        self.series[1].setPen(QPen(Qt.green))
+        self.series[2].setPen(QPen(Qt.blue))
+        self.series[3].setPen(QPen(Qt.yellow))
+        for series in self.series:
+            series.setUseOpenGL(True)
+        self.view = CustomChartView()
         self.glMain = QGridLayout()
 
         self.glMain.addWidget(self.view, 0, 0)
@@ -56,10 +81,19 @@ class TestWindow(QMainWindow):
         self.setCentralWidget(wCenter)
         self.setup()
 
-        self.timer = QTimer()
-        self.timer.setInterval(500)
-        self.timer.timeout.connect(self.recieve_data)
-        self.timer.start()
+        self.view.setWidget(self)
+        self.view.startTimer(500)
+
+        # self.setPoints()
+
+        # QMessageBox.warning(self, 'Error with getting data', 'Sorry, but application can\'t recieve data from Arduino. Please check connection between Arduino and PC')
+
+        # QFileDialog.getSaveFileName(self, 'Save temperature graph', 'Image (*.png);;All files (*)')
+
+        # self.timer = QTimer()
+        # self.timer.setInterval(499)
+        # self.timer.timeout.connect(self.recieve_data)
+        # self.timer.start()
 
     def setupSerialPanel(self):
         cbSerial1 = QCheckBox('Serial 1')
@@ -97,38 +131,51 @@ class TestWindow(QMainWindow):
 
         self.glMain.addLayout(glButtons, 1, 0, 1, 2)
 
+    def setPoints(self):
+        from random import randint
+        for i, series in enumerate(self.series):
+            arr = [QPointF(index, 50) for index in range(21)]
+            if i == 0:
+                arr[10] = QPointF(10, 53)
+                # arr[11] = QPointF(11, randint(24, 26))
+                arr[11] = QPointF(11, 70)
+            series.replace(arr)
+
     def setup(self, start=0, end=20):
         chart = QChart()
-        chart.addSeries(self.series)
-        chart.setTitle("QT Charts example")
-
         axisX = self.getXAxis(start, end)
+        chart.setTitle("Humidity graph")
         chart.addAxis(axisX, Qt.AlignBottom)
-        self.series.attachAxis(axisX)
 
         axisY = self.getYAxis()
         chart.addAxis(axisY, Qt.AlignLeft)
-        self.series.attachAxis(axisY)
+
+        for series in self.series:
+            chart.addSeries(series)
+            series.attachAxis(axisX)
+            series.attachAxis(axisY)
+
         self.view.setChart(chart)
 
     def addPoint(self, x, y):
-        self.series.append(QPointF(x, y))
+        self.series[0].append(QPointF(x, y))
         self.setup(
-            start=self.series.count() // 20 * 20,
-            end=(self.series.count() // 20 + 1) * 20
+            start=self.series[0].count() // 20 * 20,
+            end=(self.series[0].count() // 20 + 1) * 20
         )
 
     def recieve_data(self):
-        with open('input.txt') as file:
-            number = int(file.readline())
-            self.addPoint(self.series.count(), number)
+        file = open('input.txt')
+        number = int(file.readline())
+        file.close()
+        self.addPoint(self.series[0].count(), number)
 
     def getXAxis(self, start=0, end=20):
         axisX = QValueAxis()
         axisX.setLabelFormat("%i")
         axisX.setTickCount(20)
         axisX.setRange(start, end)
-        axisX.setTitleText("Date")
+        axisX.setTitleText("Time, s")
         return axisX
 
     def getYAxis(self):
@@ -136,7 +183,7 @@ class TestWindow(QMainWindow):
         axisY.setLabelFormat("%i")
         axisY.setTickCount(10)
         axisY.setRange(0, 100)
-        axisY.setTitleText("Money")
+        axisY.setTitleText("Humidity, %")
         return axisY
 
 
@@ -146,12 +193,8 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
 
     window = TestWindow()
-    window.setWindowTitle("Simple performance example")
+    window.setWindowTitle("Getting data from Arduino")
     window.show()
     window.resize(500, 400)
-
-    # threadpool = QThreadPool()
-    # worker = Worker(application=window)
-    # threadpool.start(worker)
 
     sys.exit(app.exec_())
