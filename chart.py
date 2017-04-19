@@ -1,3 +1,6 @@
+# processEvents
+
+
 # -*- coding: utf-8 -*-
 #
 # Licensed under the terms of the MIT License
@@ -8,73 +11,80 @@ Simple example illustrating Qt Charts capabilities to plot curves with
 a high number of points, using OpenGL accelerated series
 """
 
-from PyQt5.QtChart import QChart, QChartView, QLineSeries
-from PyQt5.QtGui import QPolygonF, QPainter
+from time import sleep
+
+from PyQt5.QtChart import (QChart, QChartView, QDateTimeAxis, QSplineSeries,
+                           QValueAxis)
+from PyQt5.QtCore import Qt, QPointF
+from PyQt5.QtGui import QPainter, QPolygonF
 from PyQt5.QtWidgets import QMainWindow
-
-import numpy as np
-
-
-def series_to_polyline(xdata, ydata):
-    """Convert series data to QPolygon(F) polyline
-
-    This code is derived from PythonQwt's function named
-    `qwt.plot_curve.series_to_polyline`"""
-    size = len(xdata)
-    polyline = QPolygonF(size)
-    pointer = polyline.data()
-    dtype, tinfo = np.float, np.finfo  # integers: = np.int, np.iinfo
-    pointer.setsize(2*polyline.size()*tinfo(dtype).dtype.itemsize)
-    memory = np.frombuffer(pointer, dtype)
-    memory[:(size-1)*2+1:2] = xdata
-    memory[1:(size-1)*2+2:2] = ydata
-    return polyline
 
 
 class TestWindow(QMainWindow):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, app=None):
         super(TestWindow, self).__init__(parent=parent)
-        self.ncurves = 0
-        self.chart = QChart()
-        self.chart.legend().hide()
-        self.view = QChartView(self.chart)
+        self.series = QSplineSeries()
+        self.view = QChartView()
+        self.data = []
+        self.app = app
         self.view.setRenderHint(QPainter.Antialiasing)
         self.setCentralWidget(self.view)
+        self.setup()
 
-    def set_title(self, title):
-        self.chart.setTitle(title)
+    def setup(self, start=0, end=10):
+        chart = QChart()
+        chart.addSeries(self.series)
+        chart.setTitle("QT Charts example")
 
-    def add_data(self, xdata, ydata, color=None):
-        curve = QLineSeries()
-        pen = curve.pen()
-        if color is not None:
-            pen.setColor(color)
-        pen.setWidthF(.1)
-        curve.setPen(pen)
-        curve.setUseOpenGL(True)
-        curve.append(series_to_polyline(xdata, ydata))
-        self.chart.addSeries(curve)
-        self.chart.createDefaultAxes()
-        self.ncurves += 1
+        axisX = self.getXAxis(start, end)
+        chart.addAxis(axisX, Qt.AlignBottom)
+        self.series.attachAxis(axisX)
+
+        axisY = self.getYAxis()
+        chart.addAxis(axisY, Qt.AlignLeft)
+        self.series.attachAxis(axisY)
+        self.view.setChart(chart)
+
+    def addPoint(self, x, y):
+        self.data.append(QPointF(x, y))
+        self.series.replace(self.data)
+        print(len(self.data) % 10 * 10)
+        self.setup(len(self.data) // 10 * 10, (len(self.data) // 10 + 1) * 10)
+        self.app.processEvents()
+        sleep(0.1)
+
+    def getXAxis(self, start=0, end=10):
+        axisX = QValueAxis()
+        axisX.setLabelFormat("%i")
+        axisX.setRange(start, end)
+        axisX.setTitleText("Date")
+        return axisX
+
+    def getYAxis(self):
+        axisY = QValueAxis()
+        axisY.setLabelFormat("%i")
+        axisY.setTickCount(10)
+        axisY.setRange(0, 100)
+        axisY.setTitleText("Money")
+        return axisY
 
 
 if __name__ == '__main__':
     import sys
     from PyQt5.QtWidgets import QApplication
-    from PyQt5.QtCore import Qt
     app = QApplication(sys.argv)
 
-    window = TestWindow()
-
-    npoints = 1000000
-    xdata = np.linspace(0., 10., npoints)
-    window.add_data(xdata, np.sin(xdata), color=Qt.red)
-    window.add_data(xdata, np.cos(xdata), color=Qt.blue)
-    window.set_title("Simple example with %d curves of %d points "\
-                     "(OpenGL Accelerated Series)"\
-                     % (window.ncurves, npoints))
+    window = TestWindow(app=app)
     window.setWindowTitle("Simple performance example")
     window.show()
     window.resize(500, 400)
+
+    index = 0
+
+    while True:
+        with open('input.txt') as file:
+            number = int(file.readline())
+            window.addPoint(index, number)
+        index += 1
 
     sys.exit(app.exec_())

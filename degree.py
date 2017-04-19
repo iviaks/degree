@@ -13,51 +13,169 @@ a high number of points, using OpenGL accelerated series
 
 from time import sleep
 
-from PyQt5.QtChart import (QChart, QChartView, QDateTimeAxis, QSplineSeries,
-                           QValueAxis)
-from PyQt5.QtCore import Qt, QPointF
-from PyQt5.QtGui import QPainter, QPolygonF
-from PyQt5.QtWidgets import QMainWindow
+from PyQt5.QtChart import QChart, QChartView, QSplineSeries, QValueAxis
+from PyQt5.QtCore import QPointF, QRunnable, Qt, QThreadPool, QTimer, pyqtSlot, QThread, QTimerEvent
+from PyQt5.QtGui import QPainter, QPen
+from PyQt5.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QGridLayout,
+                             QHBoxLayout, QMainWindow, QMessageBox,
+                             QPushButton, QVBoxLayout, QWidget)
+
+
+def recieve_data():
+    with open('input.txt') as file:
+        return int(file.readline())
+
+
+class CustomChartView(QChartView):
+    def __init__(self, *args, **kwargs):
+        self.index = 0
+        return super(CustomChartView, self).__init__(*args, **kwargs)
+
+    def setWidget(self, widget=None):
+        self.widget = widget
+
+    def timerEvent(self, *args):
+        self.widget.addPoint(self.index, recieve_data())
+        self.index += 1
+
+
+class Worker(QRunnable):
+    def __init__(self, application=None):
+        super(Worker, self).__init__()
+        self.application = application
+
+    @pyqtSlot()
+    def run(self):
+        index = 0
+
+        while True:
+            with open('input.txt') as file:
+                number = int(file.readline())
+                self.application.addPoint(index, number)
+
+            index += 1
+            sleep(0.1)
 
 
 class TestWindow(QMainWindow):
-    def __init__(self, parent=None, app=None):
+    def __init__(self, parent=None):
         super(TestWindow, self).__init__(parent=parent)
-        self.series = QSplineSeries()
-        self.view = QChartView()
-        self.data = []
-        self.app = app
+        self.series = [QSplineSeries() for index in range(4)]
+        self.series[0].setPen(QPen(Qt.red))
+        self.series[1].setPen(QPen(Qt.green))
+        self.series[2].setPen(QPen(Qt.blue))
+        self.series[3].setPen(QPen(Qt.yellow))
+        for series in self.series:
+            series.setUseOpenGL(True)
+        self.view = CustomChartView()
+        self.glMain = QGridLayout()
+
+        self.glMain.addWidget(self.view, 0, 0)
+        self.setupSerialPanel()
+        self.setupButtons()
+
+        wCenter = QWidget()
+        wCenter.setLayout(self.glMain)
+
         self.view.setRenderHint(QPainter.Antialiasing)
-        self.setCentralWidget(self.view)
+        self.setCentralWidget(wCenter)
         self.setup()
 
-    def setup(self, start=0, end=10):
-        chart = QChart()
-        chart.addSeries(self.series)
-        chart.setTitle("QT Charts example")
+        self.view.setWidget(self)
+        self.view.startTimer(500)
 
+        # self.setPoints()
+
+        # QMessageBox.warning(self, 'Error with getting data', 'Sorry, but application can\'t recieve data from Arduino. Please check connection between Arduino and PC')
+
+        # QFileDialog.getSaveFileName(self, 'Save temperature graph', 'Image (*.png);;All files (*)')
+
+        # self.timer = QTimer()
+        # self.timer.setInterval(499)
+        # self.timer.timeout.connect(self.recieve_data)
+        # self.timer.start()
+
+    def setupSerialPanel(self):
+        cbSerial1 = QCheckBox('Serial 1')
+        cbSerial2 = QCheckBox('Serial 2')
+        cbSerial3 = QCheckBox('Serial 3')
+        cbSerial4 = QCheckBox('Serial 4')
+
+        cbType = QComboBox()
+        cbType.addItems(['Temperature', 'Humidity'])
+
+        glSerial = QVBoxLayout()
+
+        glSerial.addWidget(cbSerial1)
+        glSerial.addWidget(cbSerial2)
+        glSerial.addWidget(cbSerial3)
+        glSerial.addWidget(cbSerial4)
+        glSerial.addWidget(cbType)
+
+        self.glMain.addLayout(glSerial, 0, 1)
+
+    def setupButtons(self):
+        pbStart = QPushButton('Start')
+        pbStop = QPushButton('Stop')
+        pbClear = QPushButton('Clear')
+        pbSave = QPushButton('Save')
+        pbClose = QPushButton('Close')
+
+        glButtons = QHBoxLayout()
+
+        glButtons.addWidget(pbStart)
+        glButtons.addWidget(pbStop)
+        glButtons.addWidget(pbSave)
+        glButtons.addWidget(pbClear)
+        glButtons.addWidget(pbClose)
+
+        self.glMain.addLayout(glButtons, 1, 0, 1, 2)
+
+    def setPoints(self):
+        from random import randint
+        for i, series in enumerate(self.series):
+            arr = [QPointF(index, 50) for index in range(21)]
+            if i == 0:
+                arr[10] = QPointF(10, 53)
+                # arr[11] = QPointF(11, randint(24, 26))
+                arr[11] = QPointF(11, 70)
+            series.replace(arr)
+
+    def setup(self, start=0, end=20):
+        chart = QChart()
         axisX = self.getXAxis(start, end)
+        chart.setTitle("Humidity graph")
         chart.addAxis(axisX, Qt.AlignBottom)
-        self.series.attachAxis(axisX)
 
         axisY = self.getYAxis()
         chart.addAxis(axisY, Qt.AlignLeft)
-        self.series.attachAxis(axisY)
+
+        for series in self.series:
+            chart.addSeries(series)
+            series.attachAxis(axisX)
+            series.attachAxis(axisY)
+
         self.view.setChart(chart)
 
     def addPoint(self, x, y):
-        self.data.append(QPointF(x, y))
-        self.series.replace(self.data)
-        print(len(self.data) % 10 * 10)
-        self.setup(len(self.data) // 10 * 10, (len(self.data) // 10 + 1) * 10)
-        self.app.processEvents()
-        sleep(0.1)
+        self.series[0].append(QPointF(x, y))
+        self.setup(
+            start=self.series[0].count() // 20 * 20,
+            end=(self.series[0].count() // 20 + 1) * 20
+        )
 
-    def getXAxis(self, start=0, end=10):
+    def recieve_data(self):
+        file = open('input.txt')
+        number = int(file.readline())
+        file.close()
+        self.addPoint(self.series[0].count(), number)
+
+    def getXAxis(self, start=0, end=20):
         axisX = QValueAxis()
         axisX.setLabelFormat("%i")
+        axisX.setTickCount(20)
         axisX.setRange(start, end)
-        axisX.setTitleText("Date")
+        axisX.setTitleText("Time, s")
         return axisX
 
     def getYAxis(self):
@@ -65,7 +183,7 @@ class TestWindow(QMainWindow):
         axisY.setLabelFormat("%i")
         axisY.setTickCount(10)
         axisY.setRange(0, 100)
-        axisY.setTitleText("Money")
+        axisY.setTitleText("Humidity, %")
         return axisY
 
 
@@ -74,17 +192,9 @@ if __name__ == '__main__':
     from PyQt5.QtWidgets import QApplication
     app = QApplication(sys.argv)
 
-    window = TestWindow(app=app)
-    window.setWindowTitle("Simple performance example")
+    window = TestWindow()
+    window.setWindowTitle("Getting data from Arduino")
     window.show()
     window.resize(500, 400)
-
-    index = 0
-
-    while True:
-        with open('input.txt') as file:
-            number = int(file.readline())
-            window.addPoint(index, number)
-        index += 1
 
     sys.exit(app.exec_())
