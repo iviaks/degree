@@ -6,5 +6,10 @@ ser.port = '/dev/ttyACM0'
 ser.open()
 for i in range(100):
     ser.flush()
-    print(ser.read(2).decode('utf-8')[::-1])
+    s = ''
+    ch = ser.read()
+    while ch != b'\n':
+        s += ch.decode('utf-8')
+        ch = ser.read()
+    print(s)
 ser.close()

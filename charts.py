@@ -15,21 +15,18 @@ from array import array
 
 
 def recieve_data():
+
     with serial.Serial(port='/dev/ttyACM0') as ser:
-        # print(ser.cts)
-        # x = array('b')
-        # ser.readinto(x)
-        # print(x)
+        ser.flush()
+        s = ''
+        ch = ser.read()
 
-        # print(ser.inWaiting())
+        while ch != b'\n':
+            s += ch.decode('utf-8')
+            ch = ser.read()
+        print(s)
 
-        # print(ser.readline())
-
-        # while ser.inWaiting():
-            # print(ser.read())
-
-        # return 50
-        return float(ser.read(2).decode('utf-8'))
+        return float(s)
 
 
 class CustomChartView(QChartView):
@@ -40,8 +37,22 @@ class CustomChartView(QChartView):
     def setWidget(self, widget=None):
         self.widget = widget
 
+    def get_from_serial(self, ser):
+        s = ''
+        ch = ser.read()
+
+        while ch != b'\n':
+            s += ch.decode('utf-8')
+            ch = ser.read()
+
+        return float(s)
+
     def timerEvent(self, *args):
-        self.widget.addPoint(self.index, recieve_data())
+        with serial.Serial(port='/dev/ttyACM0') as ser:
+            ser.flush()
+            self.widget.addPoint(0, self.index, self.get_from_serial(ser))
+            self.widget.addPoint(1, self.index, self.get_from_serial(ser))
+
         self.index += 1
 
 
@@ -133,12 +144,12 @@ class TestWindow(QMainWindow):
             series.attachAxis(self.axisX)
             series.attachAxis(self.axisY)
 
-    def addPoint(self, x, y):
-        self.series[0].append(QPointF(x, y))
-        if not len(self.series[0]) % 20:
+    def addPoint(self, index, x, y):
+        self.series[index].append(QPointF(x, y))
+        if not len(self.series[index]) % 20:
             self.axisX.setRange(
-                self.series[0].count() // 20 * 20,
-                (self.series[0].count() // 20 + 1) * 20
+                self.series[index].count() // 20 * 20,
+                (self.series[index].count() // 20 + 1) * 20
             )
         # self.setup(
         #     start=self.series[0].count() // 20 * 20,
