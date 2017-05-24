@@ -3,20 +3,33 @@
 # Copyright (c) 2017 Saykov Max
 
 
-from time import sleep
-
+import serial
 from PyQt5.QtChart import QChart, QChartView, QSplineSeries, QValueAxis
-from PyQt5.QtCore import (QPointF, QRunnable, Qt, QThread, QThreadPool, QTimer,
-                          QTimerEvent, pyqtSlot)
+from PyQt5.QtCore import QPointF, Qt
 from PyQt5.QtGui import QPainter, QPen
 from PyQt5.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QGridLayout,
                              QHBoxLayout, QMainWindow, QMessageBox,
                              QPushButton, QVBoxLayout, QWidget)
 
+from array import array
+
 
 def recieve_data():
-    with open('input.txt') as file:
-        return int(file.readline())
+    with serial.Serial(port='/dev/ttyACM0') as ser:
+        # print(ser.cts)
+        # x = array('b')
+        # ser.readinto(x)
+        # print(x)
+
+        # print(ser.inWaiting())
+
+        # print(ser.readline())
+
+        # while ser.inWaiting():
+            # print(ser.read())
+
+        # return 50
+        return float(ser.read(2).decode('utf-8'))
 
 
 class CustomChartView(QChartView):
@@ -58,7 +71,7 @@ class TestWindow(QMainWindow):
         self.setup()
 
         self.view.setWidget(self)
-        self.view.startTimer(200)
+        self.view.startTimer(0)
         self.view.setChart(self.chart)
 
     def setupSerialPanel(self):
@@ -132,10 +145,17 @@ class TestWindow(QMainWindow):
         #     end=(self.series[0].count() // 20 + 1) * 20
         # )
 
+
+    # unused func
     def recieve_data(self):
-        file = open('input.txt')
-        number = int(file.readline())
-        file.close()
+        # file = open('input.txt')
+        # number = int(file.readline())
+        # file.close()
+        self.serial.open()
+        self.serial.flush()
+        number = float(self.serial.read(2).decode('utf-8'))
+        print(number)
+        self.serial.close()
         self.addPoint(self.series[0].count(), number)
 
     def getXAxis(self, start=0, end=20):
