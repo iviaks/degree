@@ -6,7 +6,8 @@
 from time import sleep
 
 from PyQt5.QtChart import QChart, QChartView, QSplineSeries, QValueAxis
-from PyQt5.QtCore import QPointF, QRunnable, Qt, QThreadPool, QTimer, pyqtSlot, QThread, QTimerEvent
+from PyQt5.QtCore import (QPointF, QRunnable, Qt, QThread, QThreadPool, QTimer,
+                          QTimerEvent, pyqtSlot)
 from PyQt5.QtGui import QPainter, QPen
 from PyQt5.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QGridLayout,
                              QHBoxLayout, QMainWindow, QMessageBox,
@@ -29,24 +30,6 @@ class CustomChartView(QChartView):
     def timerEvent(self, *args):
         self.widget.addPoint(self.index, recieve_data())
         self.index += 1
-
-
-class Worker(QRunnable):
-    def __init__(self, application=None):
-        super(Worker, self).__init__()
-        self.application = application
-
-    @pyqtSlot()
-    def run(self):
-        index = 0
-
-        while True:
-            with open('input.txt') as file:
-                number = int(file.readline())
-                self.application.addPoint(index, number)
-
-            index += 1
-            sleep(0.1)
 
 
 class TestWindow(QMainWindow):
