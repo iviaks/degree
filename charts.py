@@ -43,6 +43,7 @@ class TestWindow(QMainWindow):
         for series in self.series:
             series.setUseOpenGL(True)
         self.view = CustomChartView()
+        self.chart = QChart()
         self.glMain = QGridLayout()
 
         self.glMain.addWidget(self.view, 0, 0)
@@ -57,7 +58,8 @@ class TestWindow(QMainWindow):
         self.setup()
 
         self.view.setWidget(self)
-        self.view.startTimer(1000)
+        self.view.startTimer(200)
+        self.view.setChart(self.chart)
 
     def setupSerialPanel(self):
         cbSerial1 = QCheckBox('Serial 1')
@@ -105,28 +107,30 @@ class TestWindow(QMainWindow):
                 arr[11] = QPointF(11, 70)
             series.replace(arr)
 
-    def setup(self, start=0, end=20):
-        chart = QChart()
-        axisX = self.getXAxis(start, end)
-        chart.setTitle("Humidity graph")
-        chart.addAxis(axisX, Qt.AlignBottom)
+    def setup(self):
+        self.axisX = self.getXAxis(0, 20)
+        self.chart.setTitle("Humidity graph")
+        self.chart.addAxis(self.axisX, Qt.AlignBottom)
 
-        axisY = self.getYAxis()
-        chart.addAxis(axisY, Qt.AlignLeft)
+        self.axisY = self.getYAxis()
+        self.chart.addAxis(self.axisY, Qt.AlignLeft)
 
         for series in self.series:
-            chart.addSeries(series)
-            series.attachAxis(axisX)
-            series.attachAxis(axisY)
-
-        self.view.setChart(chart)
+            self.chart.addSeries(series)
+            series.attachAxis(self.axisX)
+            series.attachAxis(self.axisY)
 
     def addPoint(self, x, y):
         self.series[0].append(QPointF(x, y))
-        self.setup(
-            start=self.series[0].count() // 20 * 20,
-            end=(self.series[0].count() // 20 + 1) * 20
-        )
+        if not len(self.series[0]) % 20:
+            self.axisX.setRange(
+                self.series[0].count() // 20 * 20,
+                (self.series[0].count() // 20 + 1) * 20
+            )
+        # self.setup(
+        #     start=self.series[0].count() // 20 * 20,
+        #     end=(self.series[0].count() // 20 + 1) * 20
+        # )
 
     def recieve_data(self):
         file = open('input.txt')
