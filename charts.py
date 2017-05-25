@@ -11,27 +11,9 @@ from PyQt5.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QGridLayout,
                              QHBoxLayout, QMainWindow, QMessageBox,
                              QPushButton, QVBoxLayout, QWidget)
 
-from array import array
-
-
-def recieve_data():
-
-    with serial.Serial(port='/dev/ttyACM0') as ser:
-        ser.flush()
-        s = ''
-        ch = ser.read()
-
-        while ch != b'\n':
-            s += ch.decode('utf-8')
-            ch = ser.read()
-        print(s)
-
-        return float(s)
-
 
 class CustomChartView(QChartView):
     def __init__(self, *args, **kwargs):
-        self.index = 0
         return super(CustomChartView, self).__init__(*args, **kwargs)
 
     def setWidget(self, widget=None):
@@ -47,16 +29,25 @@ class CustomChartView(QChartView):
 
         return float(s)
 
+    # def timerEvent(self, *args):
+    #     with open('input.txt') as file:
+    #         self.widget.addPoint(
+    #             0, float(file.readline())
+    #         )
+    #         self.widget.addPoint(
+    #             1, float(file.readline())
+    #         )
+
     def timerEvent(self, *args):
         with serial.Serial(port='/dev/ttyACM0') as ser:
             ser.flush()
-            self.widget.addPoint(0, self.index, self.get_from_serial(ser))
-            self.widget.addPoint(1, self.index, self.get_from_serial(ser))
-
-        self.index += 1
+            self.widget.addPoint(0, self.get_from_serial(ser))
+            self.widget.addPoint(1, self.get_from_serial(ser))
 
 
 class TestWindow(QMainWindow):
+    timer_id = None
+
     def __init__(self, parent=None):
         super(TestWindow, self).__init__(parent=parent)
         self.series = [QSplineSeries() for index in range(4)]
@@ -82,25 +73,26 @@ class TestWindow(QMainWindow):
         self.setup()
 
         self.view.setWidget(self)
-        self.view.startTimer(0)
+        # self.view.startTimer(200)
         self.view.setChart(self.chart)
 
     def setupSerialPanel(self):
-        cbSerial1 = QCheckBox('Serial 1')
-        cbSerial2 = QCheckBox('Serial 2')
-        cbSerial3 = QCheckBox('Serial 3')
-        cbSerial4 = QCheckBox('Serial 4')
+        # cbSerial1 = QCheckBox('Serial 1')
+        # cbSerial2 = QCheckBox('Serial 2')
+        # cbSerial3 = QCheckBox('Serial 3')
+        # cbSerial4 = QCheckBox('Serial 4')
 
-        cbType = QComboBox()
-        cbType.addItems(['Temperature', 'Humidity'])
+        self.cbType = QComboBox()
+        self.cbType.addItems(['Temperature', 'Humidity'])
+        self.cbType.currentIndexChanged.connect(self.change_label)
 
         glSerial = QVBoxLayout()
 
-        glSerial.addWidget(cbSerial1)
-        glSerial.addWidget(cbSerial2)
-        glSerial.addWidget(cbSerial3)
-        glSerial.addWidget(cbSerial4)
-        glSerial.addWidget(cbType)
+        # glSerial.addWidget(cbSerial1)
+        # glSerial.addWidget(cbSerial2)
+        # glSerial.addWidget(cbSerial3)
+        # glSerial.addWidget(cbSerial4)
+        glSerial.addWidget(self.cbType)
 
         self.glMain.addLayout(glSerial, 0, 1)
 
@@ -110,6 +102,11 @@ class TestWindow(QMainWindow):
         pbClear = QPushButton('Clear')
         pbSave = QPushButton('Save')
         pbClose = QPushButton('Close')
+
+        pbStart.clicked.connect(self.start_getting)
+        pbStop.clicked.connect(self.stop_getting)
+        pbClear.clicked.connect(self.clear_data)
+        pbClose.clicked.connect(self.close)
 
         glButtons = QHBoxLayout()
 
@@ -121,19 +118,37 @@ class TestWindow(QMainWindow):
 
         self.glMain.addLayout(glButtons, 1, 0, 1, 2)
 
-    def setPoints(self):
-        from random import randint
-        for i, series in enumerate(self.series):
-            arr = [QPointF(index, 50) for index in range(21)]
-            if i == 0:
-                arr[10] = QPointF(10, 53)
-                # arr[11] = QPointF(11, randint(24, 26))
-                arr[11] = QPointF(11, 70)
-            series.replace(arr)
+    def start_getting(self):
+        if self.timer_id is None:
+            self.timer_id = self.view.startTimer(200)
+
+    def stop_getting(self):
+        if self.timer_id is not None:
+            self.view.killTimer(self.timer_id)
+
+        self.timer_id = None
+
+    def clear_data(self):
+        for index in range(len(self.series)):
+            self.series[index].clear()
+
+        self.axisX.setRange(0, 20)
+
+    def change_label(self):
+
+        if self.cbType.currentText() == 'Temperature':
+            self.chart.setTitle("Temperature graph")
+            self.axisY.setRange(-40, 40)
+            self.axisY.setTitleText("Temperature, °C")
+
+        elif self.cbType.currentText() == 'Humidity':
+            self.chart.setTitle("Humidity graph")
+            self.axisY.setRange(0, 100)
+            self.axisY.setTitleText("Humidity, %")
 
     def setup(self):
         self.axisX = self.getXAxis(0, 20)
-        self.chart.setTitle("Humidity graph")
+        self.chart.setTitle("Temperature graph")
         self.chart.addAxis(self.axisX, Qt.AlignBottom)
 
         self.axisY = self.getYAxis()
@@ -144,30 +159,13 @@ class TestWindow(QMainWindow):
             series.attachAxis(self.axisX)
             series.attachAxis(self.axisY)
 
-    def addPoint(self, index, x, y):
-        self.series[index].append(QPointF(x, y))
+    def addPoint(self, index, y):
+        self.series[index].append(QPointF(len(self.series[index]), y))
         if not len(self.series[index]) % 20:
             self.axisX.setRange(
-                self.series[index].count() // 20 * 20,
-                (self.series[index].count() // 20 + 1) * 20
+                len(self.series[index]) // 20 * 20,
+                (len(self.series[index]) // 20 + 1) * 20
             )
-        # self.setup(
-        #     start=self.series[0].count() // 20 * 20,
-        #     end=(self.series[0].count() // 20 + 1) * 20
-        # )
-
-
-    # unused func
-    def recieve_data(self):
-        # file = open('input.txt')
-        # number = int(file.readline())
-        # file.close()
-        self.serial.open()
-        self.serial.flush()
-        number = float(self.serial.read(2).decode('utf-8'))
-        print(number)
-        self.serial.close()
-        self.addPoint(self.series[0].count(), number)
 
     def getXAxis(self, start=0, end=20):
         axisX = QValueAxis()
@@ -181,8 +179,8 @@ class TestWindow(QMainWindow):
         axisY = QValueAxis()
         axisY.setLabelFormat("%i")
         axisY.setTickCount(10)
-        axisY.setRange(0, 100)
-        axisY.setTitleText("Humidity, %")
+        axisY.setRange(-40, 40)
+        axisY.setTitleText("Temperature, °C")
         return axisY
 
 
