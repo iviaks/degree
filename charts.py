@@ -29,20 +29,23 @@ class CustomChartView(QChartView):
 
         return float(s)
 
-    # def timerEvent(self, *args):
-    #     with open('input.txt') as file:
-    #         self.widget.addPoint(
-    #             0, float(file.readline())
-    #         )
-    #         self.widget.addPoint(
-    #             1, float(file.readline())
-    #         )
+    def get_from_file(self, file):
+        return (
+            int(file.readline()),
+            float(file.readline()),
+            float(file.readline())
+        )
 
     def timerEvent(self, *args):
-        with serial.Serial(port='/dev/ttyACM0') as ser:
-            ser.flush()
-            self.widget.addPoint(0, self.get_from_serial(ser))
-            self.widget.addPoint(1, self.get_from_serial(ser))
+        with open('input.txt') as file:
+            self.widget.addPoint(*self.get_from_file(file))
+            self.widget.addPoint(*self.get_from_file(file))
+
+    # def timerEvent(self, *args):
+    #     with serial.Serial(port='/dev/ttyACM0') as ser:
+    #         ser.flush()
+    #         self.widget.addPoint(0, self.get_from_serial(ser))
+    #         self.widget.addPoint(1, self.get_from_serial(ser))
 
 
 class TestWindow(QMainWindow):
@@ -50,13 +53,16 @@ class TestWindow(QMainWindow):
 
     def __init__(self, parent=None):
         super(TestWindow, self).__init__(parent=parent)
-        self.series = [QSplineSeries() for index in range(4)]
+        self.series = [QSplineSeries() for index in range(2)]
+        self.data = [[] for index in range(len(self.series))]
         self.series[0].setPen(QPen(Qt.red))
-        self.series[1].setPen(QPen(Qt.green))
-        self.series[2].setPen(QPen(Qt.blue))
-        self.series[3].setPen(QPen(Qt.yellow))
+        self.series[1].setPen(QPen(Qt.blue))
+        # self.series[1].setPen(QPen(Qt.blue))
+        # self.series[3].setPen(QPen(Qt.yellow))
+
         for series in self.series:
             series.setUseOpenGL(True)
+
         self.view = CustomChartView()
         self.chart = QChart()
         self.glMain = QGridLayout()
@@ -136,6 +142,9 @@ class TestWindow(QMainWindow):
 
     def change_label(self):
 
+        self.stop_getting()
+        self.clear_data()
+
         if self.cbType.currentText() == 'Temperature':
             self.chart.setTitle("Temperature graph")
             self.axisY.setRange(-40, 40)
@@ -159,8 +168,30 @@ class TestWindow(QMainWindow):
             series.attachAxis(self.axisX)
             series.attachAxis(self.axisY)
 
-    def addPoint(self, index, y):
-        self.series[index].append(QPointF(len(self.series[index]), y))
+    def addPoint(self, index, temperature, humidity):
+        self.data[index].append({
+            'temperature': temperature,
+            'humidity': humidity
+        })
+        self.setLine(index)
+
+    def setLine(self, index):
+        if self.cbType.currentText() == 'Temperature':
+            self.series[index].append(
+                QPointF(
+                    len(self.series[index]),
+                    self.data[index][-1]['temperature']
+                )
+            )
+
+        elif self.cbType.currentText() == 'Humidity':
+            self.series[index].append(
+                QPointF(
+                    len(self.series[index]),
+                    self.data[index][-1]['humidity']
+                )
+            )
+
         if not len(self.series[index]) % 20:
             self.axisX.setRange(
                 len(self.series[index]) // 20 * 20,
@@ -192,6 +223,6 @@ if __name__ == '__main__':
     window = TestWindow()
     window.setWindowTitle("Getting data from Arduino")
     window.show()
-    window.resize(500, 400)
+    # window.resize(500, 400)
 
     sys.exit(app.exec_())
