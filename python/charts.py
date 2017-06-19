@@ -3,13 +3,15 @@
 # Copyright (c) 2017 Saykov Max
 
 
+from datetime import datetime
+
 import serial
 from PyQt5.QtChart import QChart, QChartView, QSplineSeries, QValueAxis
 from PyQt5.QtCore import QPointF, Qt
 from PyQt5.QtGui import QPainter, QPen
 from PyQt5.QtWidgets import (QCheckBox, QComboBox, QDialog, QFileDialog,
-                             QGridLayout, QHBoxLayout, QMainWindow,
-                             QMessageBox, QPushButton, QTableWidget,
+                             QGridLayout, QHBoxLayout, QLabel, QMainWindow,
+                             QMessageBox, QPushButton, QSpinBox, QTableWidget,
                              QTableWidgetItem, QTabWidget, QVBoxLayout,
                              QWidget)
 
@@ -57,6 +59,10 @@ class CustomChartView(QChartView):
 
 class TestWindow(QMainWindow):
     timer_id = None
+    temperature = [-40, 40]
+    humidity = [0, 100]
+    speed = 200
+    DYNAMIC_COEFFICIENT = 0.7
 
     def __init__(self, parent=None):
         super(TestWindow, self).__init__(parent=parent)
@@ -73,6 +79,7 @@ class TestWindow(QMainWindow):
         self.view = CustomChartView()
         self.chart = QChart()
         self.glMain = QGridLayout()
+        self.setup()
 
         self.glMain.addWidget(self.view, 0, 0)
         self.setupSerialPanel()
@@ -83,7 +90,6 @@ class TestWindow(QMainWindow):
 
         self.view.setRenderHint(QPainter.Antialiasing)
         self.setCentralWidget(wCenter)
-        self.setup()
 
         self.view.setWidget(self)
         # self.view.startTimer(200)
@@ -99,15 +105,86 @@ class TestWindow(QMainWindow):
         self.cbType.addItems(['Temperature', 'Humidity'])
         self.cbType.currentIndexChanged.connect(self.change_label)
 
+        glTemperature = QGridLayout()
+        lTemperature = QLabel('Temperature range')
+        sbTemperatureMin = QSpinBox()
+        sbTemperatureMin.valueChanged.connect(self.setMinTemperature)
+        sbTemperatureMin.setMinimum(self.temperature[0])
+        sbTemperatureMin.setMaximum(self.temperature[1])
+        sbTemperatureMin.setValue(self.temperature[0])
+        sbTemperatureMax = QSpinBox()
+        sbTemperatureMax.valueChanged.connect(self.setMaxTemperature)
+        sbTemperatureMax.setMinimum(self.temperature[0])
+        sbTemperatureMax.setMaximum(self.temperature[1])
+        sbTemperatureMax.setValue(self.temperature[1])
+
+        glTemperature.addWidget(lTemperature, 0, 0, 1, 2)
+        glTemperature.addWidget(sbTemperatureMin, 1, 0)
+        glTemperature.addWidget(sbTemperatureMax, 1, 1)
+
+        glHumidity = QGridLayout()
+        lHumidity = QLabel('Humidity range')
+        sbHumidityMin = QSpinBox()
+        sbHumidityMin.setMinimum(self.humidity[0])
+        sbHumidityMin.setMaximum(self.humidity[1])
+        sbHumidityMin.setValue(self.humidity[0])
+        sbHumidityMin.valueChanged.connect(self.setMinHumidity)
+        sbHumidityMax = QSpinBox()
+        sbHumidityMax.setMinimum(self.humidity[0])
+        sbHumidityMax.setMaximum(self.humidity[1])
+        sbHumidityMax.setValue(self.humidity[1])
+        sbHumidityMax.valueChanged.connect(self.setMaxHumidity)
+
+        glHumidity.addWidget(lHumidity, 0, 0, 1, 2)
+        glHumidity.addWidget(sbHumidityMin, 1, 0)
+        glHumidity.addWidget(sbHumidityMax, 1, 1)
+
+        glSpeed = QVBoxLayout()
+        lSpeed = QLabel('Time to response')
+        sbSpeed = QSpinBox()
+        sbSpeed.setMaximum(2000)
+        sbSpeed.setValue(self.speed)
+        sbSpeed.valueChanged.connect(self.setSpeed)
+
+        glSpeed.addWidget(lSpeed)
+        glSpeed.addWidget(sbSpeed)
+
         glSerial = QVBoxLayout()
 
         # glSerial.addWidget(cbSerial1)
         # glSerial.addWidget(cbSerial2)
         # glSerial.addWidget(cbSerial3)
         # glSerial.addWidget(cbSerial4)
+        glSerial.addStretch()
+        glSerial.addLayout(glTemperature)
+        glSerial.addLayout(glHumidity)
+        glSerial.addLayout(glSpeed)
+        glSerial.addStretch()
         glSerial.addWidget(self.cbType)
+        glSerial.addStretch()
 
         self.glMain.addLayout(glSerial, 0, 1)
+
+    def setMaxTemperature(self, x):
+        self.temperature[1] = x
+        self.setAxisY()
+
+    def setMinTemperature(self, x):
+        self.temperature[0] = x
+        self.setAxisY()
+
+    def setMaxHumidity(self, x):
+        self.humidity[1] = x
+        self.setAxisY()
+
+    def setMinHumidity(self, x):
+        self.humidity[0] = x
+        self.setAxisY()
+
+    def setSpeed(self, x):
+        self.speed = x
+        self.stop_getting()
+        self.start_getting()
 
     def setupButtons(self):
         pbStart = QPushButton('Start')
@@ -134,7 +211,7 @@ class TestWindow(QMainWindow):
 
     def start_getting(self):
         if self.timer_id is None:
-            self.timer_id = self.view.startTimer(200)
+            self.timer_id = self.view.startTimer(self.speed)
 
     def stop_getting(self):
         if self.timer_id is not None:
@@ -148,20 +225,35 @@ class TestWindow(QMainWindow):
 
         self.axisX.setRange(0, 20)
 
-    def change_label(self):
-
-        self.stop_getting()
-        # self.clear_data()
-
+    def setAxisY(self):
         if self.cbType.currentText() == 'Temperature':
             self.chart.setTitle("Temperature graph")
-            self.axisY.setRange(-40, 40)
+            self.axisY.setRange(*self.temperature)
             self.axisY.setTitleText("Temperature, °C")
 
         elif self.cbType.currentText() == 'Humidity':
             self.chart.setTitle("Humidity graph")
-            self.axisY.setRange(0, 100)
+            self.axisY.setRange(*self.humidity)
             self.axisY.setTitleText("Humidity, %")
+
+    def change_label(self):
+        self.stop_getting()
+        self.setAxisY()
+
+    def slide_average(self, index, array, param):
+        working = None
+
+        if index < 3:
+            working = [item[param] for item in array[:index + 1]]
+        else:
+            working = [item[param] for item in array[index - 3:index + 1]]
+
+        return sum(working) / len(working)
+
+    def dynamic_average(self, index, array, param):
+        if index:
+            return self.DYNAMIC_COEFFICIENT * array[index][param] + (1 - self.DYNAMIC_COEFFICIENT) * array[index - 1][param]
+        return array[index][param]
 
     def show_results(self):
         dialog = QDialog()
@@ -201,9 +293,17 @@ class TestWindow(QMainWindow):
                 twHumidity.setItem(row, 0, humDate)
 
                 temperature = QTableWidgetItem()
-                temperature.setText(str(data['temperature']))
+                temperature.setText(
+                    str(self.slide_average(
+                        row, self.data[column], 'temperature'
+                    ))
+                )
                 humidity = QTableWidgetItem()
-                humidity.setText(str(data['humidity']))
+                humidity.setText(
+                    str(self.dynamic_average(
+                        row, self.data[column], 'humidity'
+                    ))
+                )
                 twTemperature.setItem(row, column + 1, temperature)
                 twHumidity.setItem(row, column + 1, humidity)
 
@@ -286,8 +386,8 @@ class TestWindow(QMainWindow):
     def getYAxis(self):
         axisY = QValueAxis()
         axisY.setLabelFormat("%i")
-        axisY.setTickCount(10)
-        axisY.setRange(-40, 40)
+        axisY.setTickCount(20)
+        axisY.setRange(*self.temperature)
         axisY.setTitleText("Temperature, °C")
         return axisY
 
