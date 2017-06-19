@@ -15,6 +15,9 @@ from PyQt5.QtWidgets import (QCheckBox, QComboBox, QDialog, QFileDialog,
 
 from datetime import datetime
 
+READING_MODE = 1  # 0
+AVAILABLE_SERIAL_PORT = '/dev/ttyACM0'
+
 
 class CustomChartView(QChartView):
     def __init__(self, *args, **kwargs):
@@ -41,15 +44,15 @@ class CustomChartView(QChartView):
         )
 
     def timerEvent(self, *args):
-        with open('input.txt') as file:
-            self.widget.addPoint(*self.get_from_file(file))
-            self.widget.addPoint(*self.get_from_file(file))
-
-    # def timerEvent(self, *args):
-    #     with serial.Serial(port='/dev/ttyACM0') as ser:
-    #         ser.flush()
-    #         self.widget.addPoint(0, self.get_from_serial(ser))
-    #         self.widget.addPoint(1, self.get_from_serial(ser))
+        if READING_MODE == 1:
+            with open('input.txt') as file:
+                self.widget.addPoint(*self.get_from_file(file))
+                self.widget.addPoint(*self.get_from_file(file))
+        elif READING_MODE == 0:
+            with serial.Serial(port=AVAILABLE_SERIAL_PORT) as ser:
+                ser.flush()
+                self.widget.addPoint(0, self.get_from_serial(ser))
+                self.widget.addPoint(1, self.get_from_serial(ser))
 
 
 class TestWindow(QMainWindow):
@@ -168,7 +171,6 @@ class TestWindow(QMainWindow):
         pbSave.clicked.connect(lambda: dialog.accept())
         pbClose = QPushButton('Close')
         pbClose.clicked.connect(lambda: dialog.reject())
-
 
         wTemperature = QWidget()
         twTemperature = QTableWidget()
