@@ -15,9 +15,7 @@ from PyQt5.QtWidgets import (QCheckBox, QComboBox, QDialog, QFileDialog,
                              QTableWidgetItem, QTabWidget, QVBoxLayout,
                              QWidget)
 
-from datetime import datetime
-
-READING_MODE = 1  # 0
+READING_MODE = 0  # 0
 AVAILABLE_SERIAL_PORT = '/dev/ttyACM0'
 
 
@@ -29,6 +27,8 @@ class CustomChartView(QChartView):
         self.widget = widget
 
     def get_from_serial(self, ser):
+        ser.flush()
+
         s = ''
         ch = ser.read()
 
@@ -36,7 +36,27 @@ class CustomChartView(QChartView):
             s += ch.decode('utf-8')
             ch = ser.read()
 
-        return float(s)
+        index = int(s)
+
+        s = ''
+        ch = ser.read()
+
+        while ch != b'\n':
+            s += ch.decode('utf-8')
+            ch = ser.read()
+
+        temp = float(s)
+
+        s = ''
+        ch = ser.read()
+
+        while ch != b'\n':
+            s += ch.decode('utf-8')
+            ch = ser.read()
+
+        hum = float(s)
+
+        return (index - 1, temp, hum)
 
     def get_from_file(self, file):
         return (
@@ -52,16 +72,15 @@ class CustomChartView(QChartView):
                 self.widget.addPoint(*self.get_from_file(file))
         elif READING_MODE == 0:
             with serial.Serial(port=AVAILABLE_SERIAL_PORT) as ser:
-                ser.flush()
-                self.widget.addPoint(0, self.get_from_serial(ser))
-                self.widget.addPoint(1, self.get_from_serial(ser))
+                self.widget.addPoint(*self.get_from_serial(ser))
+                self.widget.addPoint(*self.get_from_serial(ser))
 
 
 class TestWindow(QMainWindow):
     timer_id = None
     temperature = [-40, 40]
     humidity = [0, 100]
-    speed = 200
+    speed = 0
     DYNAMIC_COEFFICIENT = 0.7
 
     def __init__(self, parent=None):
@@ -350,6 +369,7 @@ class TestWindow(QMainWindow):
             'humidity': humidity,
             'date': datetime.now()
         })
+        self.setLine(index)
         self.setLine(index)
 
     def setLine(self, index):
